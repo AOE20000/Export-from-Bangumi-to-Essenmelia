@@ -22,7 +22,7 @@
   "name": "指令网关",
   "description": "系统级外部请求监控中心。负责拦截、验证并处理来自 ADB、Intent 或第三方应用的 API 调用。",
   "author": "System",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "tags": ["System", "Gateway", "API"]
 } -->
 *Built-in System Extension v2.1.0*
