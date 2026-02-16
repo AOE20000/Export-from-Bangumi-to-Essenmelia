@@ -17,12 +17,27 @@
 - `notifications`: 发送网关状态通知
 
 ---
-<!-- ESSENMELIA_METADATA {
+<!-- ESSENMELIA_EXTEND {
   "id": "system.external_call",
   "name": "指令网关",
   "description": "系统级外部请求监控中心。负责拦截、验证并处理来自 ADB、Intent 或第三方应用的 API 调用。",
   "author": "System",
-  "version": "2.2.0",
-  "tags": ["System", "Gateway", "API"]
+  "version": "2.1.0",
+  "tags": ["System", "Gateway", "API"],
+  "permissions": [
+    "readEvents",
+    "addEvents",
+    "updateEvents",
+    "deleteEvents",
+    "readTags",
+    "manageTags",
+    "notifications",
+    "systemInfo",
+    "navigation",
+    "network",
+    "fileSystem",
+    "readCalendar",
+    "writeCalendar"
+  ]
 } -->
-*Built-in System Extension v2.2.0*
+*Built-in System Extension v2.1.0*
