@@ -36,8 +36,3 @@
 
 ## 开发者说明
 本扩展采用 **JS/YAML** 动态 UI 引擎构建，是 Essenmelia 动态化架构的参考实现。
-
-### 权限需求
-- `readEvents`: 读取系统事件
-- `systemInfo`: 获取设备基本信息
-- `notifications`: 发送网关状态通知
