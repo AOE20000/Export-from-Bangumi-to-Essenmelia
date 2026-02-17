@@ -1,4 +1,3 @@
----
 <!-- ESSENMELIA_EXTEND {
   "id": "system.external_call",
   "name": "指令网关",
@@ -23,7 +22,7 @@
     "writeCalendar"
   ]
 } -->
-```
+
 
 # 指令网关 (Instruction Gateway)
 
