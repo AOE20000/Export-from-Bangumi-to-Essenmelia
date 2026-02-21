@@ -329,34 +329,7 @@ async function fetchCollections() {
   state.loading = false;
 }
 
-async function addToEvent(args, silent) {
-  // Try to use cached item first for better data completeness
-  if (args.subjectId && cachedItemsMap && cachedItemsMap[args.subjectId]) {
-      try {
-          const item = cachedItemsMap[args.subjectId];
-          const subject = item.subject || {};
-          const images = subject.images || {};
-          
-          // Override args with full data from cache
-          // Note: We use existing args as fallback or base, but overwrite with cache data
-          args.title = subject.name_cn || subject.name || args.title;
-          args.originalTitle = subject.name || args.originalTitle;
-          args.cover = images.common || images.medium || images.large || args.cover || '';
-          args.eps = (subject.eps || 0).toString();
-          args.watched = (item.ep_status || 0).toString();
-          args.summary = subject.summary || subject.short_summary || args.summary || '';
-          args.score = (subject.score || '0').toString();
-          args.userScore = (item.rate || '0').toString();
-          args.userComment = item.comment || args.userComment || '';
-          args.userTags = (item.tags || []).join(',');
-          args.collectionStatus = (item.type || 0).toString();
-          
-          console.log('Using cached data for import: ' + args.title);
-      } catch (e) {
-          console.log('Error using cached data: ' + e);
-      }
-  }
-
+function prepareEventData(args) {
   const title = args.title;
   const originalTitle = args.originalTitle || '';
   const cover = args.cover;
@@ -418,7 +391,6 @@ async function addToEvent(args, silent) {
   const steps = [];
   
   // Logic to determine how many steps to generate
-  // If eps is 0 (unknown), but we have watched some, generate steps for what we've watched
   let loopCount = eps;
   if (loopCount === 0 && watched > 0) {
       loopCount = watched; 
@@ -442,8 +414,6 @@ async function addToEvent(args, silent) {
           });
       }
   } else if (watched > 0) {
-      // Fallback: if loopCount is still 0 but we have watched status (shouldn't happen due to logic above)
-      // Just in case
       steps.push({
           description: `已看 ${watched} 话`,
           completed: true,
@@ -451,8 +421,7 @@ async function addToEvent(args, silent) {
       });
   }
 
-  try {
-    await essenmelia.addEvent({
+  return {
       title: title,
       description: description,
       tags: tags,
@@ -460,8 +429,41 @@ async function addToEvent(args, silent) {
       steps: steps,
       stepDisplayMode: 'number',
       stepSuffix: '话'
-    });
-    if (!silent) await essenmelia.showSnackBar('已添加到日程: ' + title);
+  };
+}
+
+async function addToEvent(args, silent) {
+  // Try to use cached item first for better data completeness
+  if (args.subjectId && cachedItemsMap && cachedItemsMap[args.subjectId]) {
+      try {
+          const item = cachedItemsMap[args.subjectId];
+          const subject = item.subject || {};
+          const images = subject.images || {};
+          
+          // Override args with full data from cache
+          args.title = subject.name_cn || subject.name || args.title;
+          args.originalTitle = subject.name || args.originalTitle;
+          args.cover = images.common || images.medium || images.large || args.cover || '';
+          args.eps = (subject.eps || 0).toString();
+          args.watched = (item.ep_status || 0).toString();
+          args.summary = subject.summary || subject.short_summary || args.summary || '';
+          args.score = (subject.score || '0').toString();
+          args.userScore = (item.rate || '0').toString();
+          args.userComment = item.comment || args.userComment || '';
+          args.userTags = (item.tags || []).join(',');
+          args.collectionStatus = (item.type || 0).toString();
+          
+          console.log('Using cached data for import: ' + args.title);
+      } catch (e) {
+          console.log('Error using cached data: ' + e);
+      }
+  }
+
+  const data = prepareEventData(args);
+
+  try {
+    await essenmelia.addEvent(data);
+    if (!silent) await essenmelia.showSnackBar('已添加到日程: ' + data.title);
   } catch (e) {
     if (!silent) await essenmelia.showSnackBar('添加失败: ' + e);
     throw e;
@@ -514,6 +516,192 @@ async function importAll() {
     }
     
     await essenmelia.showSnackBar('导入完成: 成功 ' + successCount + '/' + cachedItems.length);
+}
+
+// Mark all steps as completed for events with "看过" tag
+async function markWatchedAsDone() {
+  if (state.loading) return;
+  
+  const confirm = await essenmelia.showConfirmDialog({
+    title: '确认操作',
+    message: '是否将所有包含“看过”标签的事件的所有步骤标记为已完成？此操作不可撤销。',
+    confirmLabel: '确定',
+    cancelLabel: '取消'
+  });
+  
+  if (!confirm) return;
+
+  state.loading = true;
+  await essenmelia.showSnackBar('正在获取所有事件...');
+  
+  try {
+    const events = await essenmelia.getEvents();
+    console.log(`Fetched ${events.length} events`);
+    
+    const watchedEvents = events.filter(e => e.tags && e.tags.includes('看过'));
+    console.log(`Found ${watchedEvents.length} watched events`);
+    
+    if (watchedEvents.length === 0) {
+      await essenmelia.showSnackBar('未找到包含“看过”标签的事件');
+      state.loading = false;
+      return;
+    }
+
+    let count = 0;
+    for (let i = 0; i < watchedEvents.length; i++) {
+      const event = watchedEvents[i];
+      // Optional: Show progress via snackbar periodically
+      if (i % 5 === 0) {
+         await essenmelia.showSnackBar(`正在处理: ${event.title} (${i+1}/${watchedEvents.length})`);
+      }
+      
+      if (event.steps && event.steps.length > 0) {
+        let modified = false;
+        const newSteps = event.steps.map(step => {
+           if (!step.completed) {
+             modified = true;
+             return { ...step, completed: true };
+           }
+           return step;
+        });
+        
+        if (modified) {
+          console.log(`Updating event ${event.id} steps`);
+          // Note: updateEvent expects 'steps' to be a list of maps, 
+          // and since we are in JS, passing array of objects works.
+          await essenmelia.updateEvent({
+            id: event.id,
+            steps: newSteps
+          });
+          count++;
+        }
+      }
+    }
+    
+    await essenmelia.showSnackBar(`操作完成，已更新 ${count} 个事件`);
+    
+  } catch (e) {
+    console.log('Error:', e);
+    await essenmelia.showSnackBar('操作失败: ' + e);
+  } finally {
+    state.loading = false;
+  }
+}
+
+async function compareAndMergeCollections() {
+  if (state.loading) return;
+  
+  if (!cachedItems || cachedItems.length === 0) {
+      await essenmelia.showSnackBar('请先获取收藏列表，再执行对比导入');
+      return;
+  }
+  
+  const confirm = await essenmelia.showConfirmDialog({
+    title: '确认对比导入',
+    message: '此操作将对比本地日程与 Bangumi 收藏：\n1. 更新已有日程的标题、简介、进度（不重新下载图片）。\n2. 导入本地缺失的日程。\n是否继续？',
+    confirmLabel: '开始合并',
+    cancelLabel: '取消'
+  });
+  
+  if (!confirm) return;
+
+  state.loading = true;
+  await essenmelia.showSnackBar('正在获取本地日程...');
+  
+  try {
+    const localEvents = await essenmelia.getEvents();
+    
+    // Build map of Local Event by Bangumi ID
+    const localMap = {};
+    const regex = /Bangumi ID: (\d+)/;
+    
+    for (let i = 0; i < localEvents.length; i++) {
+        const event = localEvents[i];
+        if (event.description) {
+            const match = event.description.match(regex);
+            if (match && match[1]) {
+                localMap[match[1]] = event;
+            }
+        }
+    }
+    
+    let addedCount = 0;
+    let updatedCount = 0;
+    let errorCount = 0;
+    
+    await essenmelia.showSnackBar('开始对比合并...');
+    
+    const total = cachedItems.length;
+
+    for (let i = 0; i < total; i++) {
+        const item = cachedItems[i];
+        const subject = item.subject || {};
+        const subjectId = subject.id;
+        
+        if (!subjectId) continue;
+        
+        // Progress update every 10 items
+        if (i % 10 === 0) {
+             await essenmelia.showSnackBar(`正在处理... (${i+1}/${total})`);
+        }
+        
+        // Construct args (same logic as importAll/addToEvent cache override)
+        const images = subject.images || {};
+        const args = {
+            title: subject.name_cn || subject.name,
+            originalTitle: subject.name,
+            cover: images.common || images.medium || images.large || '',
+            eps: (subject.eps || 0).toString(),
+            watched: (item.ep_status || 0).toString(),
+            summary: subject.summary || subject.short_summary || '',
+            score: (subject.score || '0').toString(),
+            userScore: (item.rate || '0').toString(),
+            userComment: item.comment || '',
+            userTags: (item.tags || []).join(','),
+            collectionStatus: (item.type || 0).toString(),
+            subjectId: subjectId
+        };
+
+        const data = prepareEventData(args);
+        
+        try {
+            if (localMap[subjectId]) {
+                // Update existing
+                const localEvent = localMap[subjectId];
+                
+                // Exclude imageUrl to prevent overwrite/download
+                const updateData = {
+                    id: localEvent.id,
+                    title: data.title,
+                    description: data.description,
+                    tags: data.tags,
+                    steps: data.steps,
+                    stepDisplayMode: data.stepDisplayMode,
+                    stepSuffix: data.stepSuffix
+                    // imageUrl is explicitly OMITTED
+                };
+                
+                await essenmelia.updateEvent(updateData);
+                updatedCount++;
+            } else {
+                // Add new
+                await essenmelia.addEvent(data);
+                addedCount++;
+            }
+        } catch (e) {
+            console.log('Error processing ' + args.title + ': ' + e);
+            errorCount++;
+        }
+    }
+    
+    await essenmelia.showSnackBar(`合并完成: 新增 ${addedCount}, 更新 ${updatedCount}, 失败 ${errorCount}`);
+    
+  } catch (e) {
+    console.log('Error in merge:', e);
+    await essenmelia.showSnackBar('合并失败: ' + e);
+  } finally {
+    state.loading = false;
+  }
 }
 
 // Lifecycle hook

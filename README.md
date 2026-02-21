@@ -9,7 +9,9 @@
   "permissions": [
     "network",
     "uiInteraction",
-    "addEvents"
+    "addEvents",
+    "readEvents",
+    "updateEvents"
   ],
   "view": "view.yaml"
 } -->

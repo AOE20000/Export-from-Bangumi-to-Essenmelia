@@ -22,15 +22,29 @@ children:
               label: "默认标签 (以逗号分隔)"
               stateKey: "defaultTags"
               hintText: "例如: 追番, 动漫"
-          - type: row
+          - type: wrap
             props:
-              mainAxisAlignment: end
+              alignment: end
+              spacing: 8
+              runSpacing: 8
               padding: [0, 16, 0, 0]
             children:
               - type: button
                 props:
+                  label: "一键完成'看过'"
+                  icon: 0xe5ca # check
+                  variant: tonal
+                  onTap: "markWatchedAsDone"
+              - type: button
+                props:
+                  label: "对比导入"
+                  icon: 0xe8d4
+                  variant: tonal
+                  onTap: "compareAndMergeCollections"
+              - type: button
+                props:
                   label: "获取收藏"
-                  icon: 0xe8b6 # search
+                  icon: 0xe8b6 # search icon
                   variant: filled
                   onTap: "fetchCollections"
 
