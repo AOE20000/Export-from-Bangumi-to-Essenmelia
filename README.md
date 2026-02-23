@@ -1,6 +1,6 @@
 <!-- ESSENMELIA_EXTEND {
   "id": "cn.thebearsoft.bangumi_collection",
-  "name": "Bangumi 收藏",
+  "name": "Bangumi 收藏导入",
   "description": "获取 Bangumi.tv 用户收藏数据，并以纯 Material 3 组件展示。",
   "author": "BearYe",
   "version": "1.1.0",
@@ -16,9 +16,9 @@
   "view": "view.yaml"
 } -->
 
-# Bangumi 收藏扩展
+# Bangumi 收藏导入扩展
 
-这是一个纯 MD3 组件实现的扩展，用于查看 Bangumi.tv 用户的收藏列表。
+这是一个纯 MD3 组件实现的扩展，用于导入 Bangumi.tv 用户的收藏列表。
 
 ## 功能
 - 输入用户名获取收藏列表
