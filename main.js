@@ -690,6 +690,8 @@ async function compareAndMergeCollections() {
                 const localEvent = localMap[subjectId];
                 
                 // Exclude imageUrl to prevent overwrite/download
+                // IMPORTANT: Pass all other fields from localEvent to avoid accidental overwrite with nulls
+                // if updateEvent implementation requires full object for replacement.
                 const updateData = {
                     id: localEvent.id,
                     title: data.title,
@@ -697,8 +699,11 @@ async function compareAndMergeCollections() {
                     tags: data.tags,
                     steps: data.steps,
                     stepDisplayMode: data.stepDisplayMode,
-                    stepSuffix: data.stepSuffix
-                    // imageUrl is explicitly OMITTED
+                    stepSuffix: data.stepSuffix,
+                    imageUrl: localEvent.imageUrl, // Preserve existing image
+                    reminderTime: localEvent.reminderTime,
+                    reminderRecurrence: localEvent.reminderRecurrence,
+                    reminderScheme: localEvent.reminderScheme
                 };
                 
                 await essenmelia.updateEvent(updateData);
