@@ -689,25 +689,46 @@ async function compareAndMergeCollections() {
                 // Update existing
                 const localEvent = localMap[subjectId];
                 
-                // Exclude imageUrl to prevent overwrite/download
-                // IMPORTANT: Pass all other fields from localEvent to avoid accidental overwrite with nulls
-                // if updateEvent implementation requires full object for replacement.
-                const updateData = {
-                    id: localEvent.id,
-                    title: data.title,
-                    description: data.description,
-                    tags: data.tags,
-                    steps: data.steps,
-                    stepDisplayMode: data.stepDisplayMode,
-                    stepSuffix: data.stepSuffix,
-                    imageUrl: localEvent.imageUrl, // Preserve existing image
-                    reminderTime: localEvent.reminderTime,
-                    reminderRecurrence: localEvent.reminderRecurrence,
-                    reminderScheme: localEvent.reminderScheme
-                };
+                // Check if update is actually needed to avoid redundant writes and confusing counts
+                // 1. Check if cover is missing in local but present in remote (Fix missing cover)
+                // 2. Check if other fields are different (optional, for stricter sync)
                 
-                await essenmelia.updateEvent(updateData);
-                updatedCount++;
+                let shouldUpdate = false;
+                let newImageUrl = localEvent.imageUrl;
+                
+                // Logic to fix missing cover
+                if (!localEvent.imageUrl && data.imageUrl) {
+                    newImageUrl = data.imageUrl;
+                    shouldUpdate = true;
+                }
+                
+                // Logic to update other metadata (title, desc, tags, steps etc.)
+                // Simple comparison:
+                if (localEvent.title !== data.title || 
+                    localEvent.description !== data.description ||
+                    JSON.stringify(localEvent.tags) !== JSON.stringify(data.tags) ||
+                    JSON.stringify(localEvent.steps) !== JSON.stringify(data.steps)) {
+                    shouldUpdate = true;
+                }
+                
+                if (shouldUpdate) {
+                    const updateData = {
+                        id: localEvent.id,
+                        title: data.title,
+                        description: data.description,
+                        tags: data.tags,
+                        steps: data.steps,
+                        stepDisplayMode: data.stepDisplayMode,
+                        stepSuffix: data.stepSuffix,
+                        imageUrl: newImageUrl, // Use fixed or existing image
+                        reminderTime: localEvent.reminderTime,
+                        reminderRecurrence: localEvent.reminderRecurrence,
+                        reminderScheme: localEvent.reminderScheme
+                    };
+                    
+                    await essenmelia.updateEvent(updateData);
+                    updatedCount++;
+                }
             } else {
                 // Add new
                 await essenmelia.addEvent(data);
